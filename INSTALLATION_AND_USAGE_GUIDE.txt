@@ -1,0 +1,211 @@
+================================================================================
+EMBER LLM PIPELINE - INSTALLATION AND USAGE GUIDE
+================================================================================
+
+TABLE OF CONTENTS:
+1. Prerequisites
+2. Installation Steps
+3. Running the Scripts
+4. Configurable Parameters
+5. Troubleshooting
+
+================================================================================
+1. PREREQUISITES
+================================================================================
+
+- Python 3.10 or higher
+- NVIDIA GPU with CUDA 11.8+ support (recommended)
+- At least 8GB GPU memory for training
+- EMBER 2018 dataset files in the ember2018/ folder
+
+Required EMBER 2018 files:
+  - ember2018/X_test.dat
+  - ember2018/X_train.dat
+  - ember2018/y_test.dat
+  - ember2018/y_train.dat
+  - ember2018/ember_model_2018.txt
+  - ember2018/test_features.jsonl
+  - ember2018/train_features_0.jsonl through train_features_5.jsonl
+
+================================================================================
+2. INSTALLATION STEPS
+================================================================================
+
+Step 1: Open a terminal in the project directory
+
+Step 2: Install Python dependencies
+    pip install -r requirements.txt
+
+Step 3: Install the local EMBER package
+    pip install ember/
+
+Step 4: Verify installation
+    python -c "import ember; print(hasattr(ember, 'read_vectorized_features'))"
+    
+    Expected output: True
+
+================================================================================
+3. RUNNING THE SCRIPTS
+================================================================================
+
+SCRIPT 1: train_lora_configurable.py
+------------------------------------
+Purpose: Train a LoRA fine-tuned model on EMBER malware data
+
+Run command:
+    python train_lora_configurable.py
+
+Output: Creates a timestamped folder with the trained model
+    Example: 20251201_143022_LoRA_r96_ember_llama/
+
+
+SCRIPT 2: model_comparison_framework.py
+---------------------------------------
+Purpose: Compare LoRA model performance against full fine-tuned model
+
+Run command:
+    python model_comparison_framework.py
+
+Output: Prints comparison metrics (BLEU, ROUGE, Semantic Similarity, etc.)
+
+
+SCRIPT 3: generate_real_ember_training_data.py
+----------------------------------------------
+Purpose: Generate training data from real EMBER 2018 samples
+
+Run command:
+    python generate_real_ember_training_data.py
+
+Output: Creates a JSONL file with training examples
+    Example: real_ember_llama_training_20251201_143022.jsonl
+
+================================================================================
+4. CONFIGURABLE PARAMETERS
+================================================================================
+
+FILE: train_lora_configurable.py
+--------------------------------
+
+Line 47 - LORA_RANK:
+    Change this to train models with different parameter percentages
+    
+    LORA_RANK = 16    ->  1.15% parameters (minimal)
+    LORA_RANK = 96    ->  6.44% parameters (optimal - RECOMMENDED)
+    LORA_RANK = 256   -> 15.50% parameters (good balance)
+    LORA_RANK = 512   -> 26.85% parameters (high capacity)
+    LORA_RANK = 896   -> 39.11% parameters (very high)
+    LORA_RANK = 1024  -> 42.00% parameters (near full)
+
+Line 44 - BASE_MODEL:
+    Base model to fine-tune (default: "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+
+Line 49 - LORA_ALPHA:
+    LoRA alpha scaling factor (default: 32)
+
+Line 50 - LORA_DROPOUT:
+    Dropout rate for LoRA layers (default: 0.1)
+
+Line 54 - TRAINING_DATA_FILE:
+    Path to the training data JSONL file
+
+Line 180 - num_train_epochs:
+    Number of training epochs (default: 2)
+
+Line 181 - per_device_train_batch_size:
+    Batch size per GPU (default: 2, reduce if out of memory)
+
+Line 184 - learning_rate:
+    Learning rate (default: 2e-4)
+
+
+FILE: model_comparison_framework.py
+-----------------------------------
+
+Line 1196 - lora_pattern:
+    Pattern to find LoRA model directory for testing
+
+    Examples:
+    lora_pattern = "20251030_000317_LoRA_r512_26pct_ember_llama"  (specific model)
+    lora_pattern = "*LoRA_r96*ember_llama"   (any r=96 model)
+    lora_pattern = "*LoRA_r256*ember_llama"  (any r=256 model)
+
+Line 1231 - num_samples:
+    Number of test samples to evaluate (default: 2)
+    Must be EVEN when balanced=True
+    Recommended: 50 or 100 for thorough evaluation
+
+Line 1231 - start_index:
+    Starting index in EMBER dataset (default: 1100)
+    Training uses 0-999, so use 1000+ for testing
+
+Line 1231 - balanced:
+    Whether to use balanced malware/benign samples (default: True)
+    True = equal malware and benign samples
+    False = sequential samples from dataset
+
+Line 66 - ember_model_path:
+    Path to EMBER LightGBM model (default: "ember2018/ember_model_2018.txt")
+
+
+FILE: generate_real_ember_training_data.py
+------------------------------------------
+
+Line 204 - num_samples:
+    Number of training samples to generate (default: 1000)
+
+Line 204 - start_index:
+    Starting index in EMBER dataset (default: 0)
+    Use 0-999 for training data, 1000+ for test data
+
+================================================================================
+5. TROUBLESHOOTING
+================================================================================
+
+ERROR: "module 'ember' has no attribute 'read_vectorized_features'"
+--------------------------------------------------------------------
+Solution: The ember package is not properly installed.
+Run: pip install ember/
+Then verify: python -c "import ember; print(hasattr(ember, 'read_vectorized_features'))"
+
+
+ERROR: "CUDA out of memory"
+---------------------------
+Solution: Reduce batch size in train_lora_configurable.py
+Change Line 181: per_device_train_batch_size=1 (instead of 2)
+Change Line 183: gradient_accumulation_steps=8 (instead of 4)
+
+
+ERROR: "Training data file not found"
+-------------------------------------
+Solution: Run generate_real_ember_training_data.py first
+Or update Line 54 in train_lora_configurable.py to point to your training file
+
+
+WARNING: "EMBER feature version 2 were computed using lief version 0.9.0"
+-------------------------------------------------------------------------
+This is informational only. The pre-vectorized features will still work.
+The warning appears because LIEF version has been updated since EMBER 2018.
+
+
+ERROR: "No LoRA model found"
+----------------------------
+Solution: Train a model first using train_lora_configurable.py
+Or check that the model directory exists and matches the pattern in Line 1196
+
+
+================================================================================
+QUICK START EXAMPLE
+================================================================================
+
+# 1. Install everything
+pip install -r requirements.txt
+pip install ember/
+
+# 2. Train a LoRA model (with default r=96)
+python train_lora_configurable.py
+
+# 3. Run model comparison
+python model_comparison_framework.py
+
+================================================================================
+
